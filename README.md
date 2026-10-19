@@ -1,4 +1,2 @@
-# Redraw-Shielding-dimensions
-Redraws the shielding wall on the FEMM HET base model, allowing you to change coordinate, thickness, height and other stuff
+# Femm iterative magnetic field
 
-Base model used also here 
