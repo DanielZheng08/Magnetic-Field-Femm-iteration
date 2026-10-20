@@ -1,11 +1,13 @@
 '''
-Daniel Zheng, 17/10/26 meow!!
+Daniel Zheng, 17/10/26
 '''
 ################[SET THESE BEFORE STARTING AND KEEP THE SAME]##################
 isolatorratio = (1.5) #bottom thickness / side thickness (NOT IN CODE RN), if changed baseline file may need to be manually editted
 ###############################################################################
 
 import femm
+import numpy as np
+from scipy.optimize import differential_evolution #not used yet will be used for iterative section later
 
 def open_femm():
     femm.openfemm()
@@ -98,8 +100,14 @@ def redraw_shielding(shieldthickness, shieldheight, shieldgap):
     femm.mi_addsegment(sp7.x, sp7.y, -73.75, 49)
     femm.mi_addsegment(sp1.x, sp1.y, sp10.x, sp10.y)
     
-        
+def change_current(newcurrent):
+    femm.mi_modifycircprop("Outer Coil", 1, newcurrent)
+    femm.mi_modifycircprop("Inner Coil", 1, newcurrent)
     
-    
-    
-    
+def change_turns(innerturns, outerturns):
+    #select and adjust inner coil
+    femm.mi_selectlabel(-62.411, 41.968)
+    femm.mi_setblockprop("24 AWG", 1, 0, 'Inner Coil', 0, 2, innerturns)
+    #select and adjust outer coil 
+    femm.mi_selectlabel(-100.15, 18.60)
+    femm.mi_setblockprop("24 AWG", 1, 0, 'Outer Coil', 0, 2, outerturns)
