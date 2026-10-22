@@ -1,6 +1,3 @@
-'''
-Daniel Zheng, 17/10/26 meow!!
-'''
 ################[SET THESE BEFORE STARTING AND KEEP THE SAME]##################
 filepath = 'C:\\Uni work\\Electric Propulsions\\IterativeBase - Copy.fem'
 isolatorratio = (1.5) #bottom thickness / side thickness (NOT IN CODE RN), if changed baseline file may need to be manually editted
@@ -126,9 +123,21 @@ def change_turns(innerturns, outerturns):
     penalties and bonus points can then be given for bottom 5 middle points etc'''
 
 #DO LATER: THESE ARE INPUTTED
+
+def point_select(x1,y1,x2,y2,x3,y3):
+    '''
+    Lets you choose the points for running the fd functions
+    '''
+    middlerp = (x1,y1)
+    leftrp = (x2,y2)
+    rightrp = (x3,y3)
+    return middlerp, leftrp, rightrp
+
+'''
 middlerp = (-82, 32) #middle reference point
 leftrp = (-87.2, 32) #left reference point
 rightrp = (-76.8, 32) #right reference point
+'''
 
 def get_uniformity(y): #standard deviation for mag field density at a specific y level, want closest to 0
     '''BEFORE RUNNING THE FEMM DESIGN MUST BE ANALYSED do RUN_FEMM()'''
@@ -161,3 +170,4 @@ def objective(): #scoring function thing
     bonus = 0 #better score for what we want
     # score = uniformity + fdcentre - fdmiddle 
     
+
