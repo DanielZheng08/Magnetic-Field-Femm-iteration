@@ -111,3 +111,6 @@ def change_turns(innerturns, outerturns):
     #select and adjust outer coil 
     femm.mi_selectlabel(-100.15, 18.60)
     femm.mi_setblockprop("24 AWG", 1, 0, 'Outer Coil', 0, 2, outerturns)
+
+def test123():
+    return "hello world"
