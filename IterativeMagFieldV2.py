@@ -1,3 +1,6 @@
+'''
+Daniel Zheng, 17/10/26 meow!!
+'''
 ################[SET THESE BEFORE STARTING AND KEEP THE SAME]##################
 filepath = 'C:\\Uni work\\Electric Propulsions\\IterativeBase - Copy.fem'
 isolatorratio = (1.5) #bottom thickness / side thickness (NOT IN CODE RN), if changed baseline file may need to be manually editted
@@ -11,14 +14,15 @@ def open_femm():
     femm.openfemm()
     femm.opendocument(filepath)
     
-def check_nodes():
-    for i in shieldnodes:
-        print(i.__repr__())
-    
 def run_femm():
     femm.mi_createmesh()
     femm.mi_analyse(0)
     femm.mi_loadsolution()
+    
+def check_nodes():
+    '''prints each of the shield nodes that are moved in console'''
+    for i in shieldnodes:
+        print(i.__repr__())
     
 class ShieldingNodes():
     def __init__(self, name, x, y, offset, swh, swt, swg): 
@@ -54,6 +58,7 @@ sp10 = ShieldingNodes("sp10", -69.75, 5, 2, 72, 2, 2)
 shieldnodes = [sp1, sp2, sp3, sp4, sp5, sp6, sp7, sp8, sp9, sp10]
 
 def redraw_shielding(shieldthickness, shieldheight, shieldgap):
+    '''Redrawst the mag shielding walls given: a thickness, height (from point 1 to 2), and gap (displacement in x from the channel)'''
     #checks inputs are valid
     if shieldthickness<0 or shieldheight<0 or shieldgap<0: #dimensions cant be negative (maybe change for height? small did but i think that would be bad for mag field)
         raise ValueError("Values must be >= 0")
@@ -105,10 +110,14 @@ def redraw_shielding(shieldthickness, shieldheight, shieldgap):
     femm.mi_addsegment(sp1.x, sp1.y, sp10.x, sp10.y)
     
 def change_current(newcurrent):
+    if newcurrent <0:
+        raise ValueError("Value must be more than 0")
     femm.mi_modifycircprop("Outer Coil", 1, newcurrent)
     femm.mi_modifycircprop("Inner Coil", 1, newcurrent)
     
 def change_turns(innerturns, outerturns):
+    if innerturns <0 or outerturns <0:
+        raise ValueError("Value must be more than 0")
     #select and adjust inner coil
     femm.mi_selectlabel(-62.411, 41.968)
     femm.mi_setblockprop("24 AWG", 1, 0, 'Inner Coil', 0, 2, innerturns)
@@ -123,51 +132,72 @@ def change_turns(innerturns, outerturns):
     penalties and bonus points can then be given for bottom 5 middle points etc'''
 
 #DO LATER: THESE ARE INPUTTED
-
-def point_select(x1,y1,x2,y2,x3,y3):
-    '''
-    Lets you choose the points for running the fd functions
-    '''
-    middlerp = (x1,y1)
-    leftrp = (x2,y2)
-    rightrp = (x3,y3)
-    return middlerp, leftrp, rightrp
-
-'''
 middlerp = (-82, 32) #middle reference point
 leftrp = (-87.2, 32) #left reference point
 rightrp = (-76.8, 32) #right reference point
-'''
+
+'''wip'''
+#leakrpL = 
+#leakrpR = 
 
 def get_uniformity(y): #standard deviation for mag field density at a specific y level, want closest to 0
-    '''BEFORE RUNNING THE FEMM DESIGN MUST BE ANALYSED do RUN_FEMM()'''
+    '''finds the stabdard deviation at a given y level of the left and right points (middle is 0)
+    BEFORE RUNNING THE FEMM DESIGN MUST BE ANALYSED do RUN_FEMM()'''
     lp = femm.mo_getb(leftrp[0], y)
     rp = femm.mo_getb(rightrp[0], y)
     value = np.sqrt(((lp[0]+82)**2 + (rp[0]+82)**2)/3)
     return value
 
-def get_fd(y): #gets the magfield flux density at the side of the channels, want closest to 0, and middle, want max value     (X AND Y COMPONENTS)
-    '''BEFORE RUNNING THE FEMM DESIGN MUST BE ANALYSED do RUN_FEMM()'''
-    print("left: ", femm.mo_getb(leftrp[0], y))
-    print("Right: ", femm.mo_getb(rightrp[0], y))
-    print("Centre: ", femm.mo_getb(middlerp[0], y))
-
-def get_fdmag(y): #MAGNITUDE
-    '''BEFORE RUNNING THE FEMM DESIGN MUST BE ANALYSED do RUN_FEMM()'''
-    left = femm.mo_getb(leftrp[0], y)
-    leftmag = np.sqrt((left[0])**2 + (left[1])**2)
-    right = femm.mo_getb(rightrp[0], y)
-    rightmag = np.sqrt((right[0])**2 + (right[1])**2)
+def get_fdmagM(y): #MAGNITUDE AT MIDDLE
+    '''finds the mag flux density at the centre of the channel at a given Y coordinate
+    BEFORE RUNNING THE FEMM DESIGN MUST BE ANALYSED do RUN_FEMM()'''
     middle = femm.mo_getb(middlerp[0], y)
     middlemag = np.sqrt((middle[0])**2 + (middle[1])**2)
-    print("left: ", leftmag)
-    print("Right: ", rightmag)
-    print("Centre: ", middlemag)
+    return(middlemag)
+def get_fdmagL(y): #MAGNITUDE AT LEFT 
+    '''finds the mag flux density at the left of the channel at a given Y coordinate
+    BEFORE RUNNING THE FEMM DESIGN MUST BE ANALYSED do RUN_FEMM()'''
+    left = femm.mo_getb(leftrp[0], y)
+    leftmag = np.sqrt((left[0])**2 + (left[1])**2)
+    return(leftmag)
+    
+def get_fdmagR(y): #MAGNITUDE AT RIGHT
+    '''finds the mag flux density at the right of the channel at a given Y coordinate
+    BEFORE RUNNING THE FEMM DESIGN MUST BE ANALYSED do RUN_FEMM()'''
+    right = femm.mo_getb(rightrp[0], y)
+    rightmag = np.sqrt((right[0])**2 + (right[1])**2)
+    return(rightmag)
 
 #iterative stuff
-def objective(): #scoring function thing
+def get_score(x): 
+    '''where objective function thingy is, lower score = more desirable
+    Order for x: Shield thickness, shield height, shield gap, inner turns, outer turns, current'''
+    try: #normally run this, CHANGES DIMENSIONS
+        redraw_shielding(x[0], x[1], x[2])
+        change_turns(x[3], x[4])
+        change_current(x[4])
+    except ValueError: #when a valueerror is raised from a function like redraw_shielding() itll do this instead
+        return 1e6 #large score so programme will not use this design 
+    
+    #use get_fd functions and stuff down here!!!
+    print("Nodes:", check_nodes())
+    run_femm()
+    
+    uniformity = get_uniformity()
+    # score = uniformity(function), -centrefdmag + sidefdmag + leakedmag ROUGH REFERENCE
     penalty = 0 #penalty for things we dont want
     bonus = 0 #better score for what we want
-    # score = uniformity + fdcentre - fdmiddle 
     
+   
+#THE OPTIMISATION PART
+#Order: Shield thickness, shield height, shield gap, inner turns, outer turns, current
+bounds = [(0.1, 6.75), (0.1,1000), (0.1, 6.75), (1,1000000), (1, 1000000), (1,10)]    
+    
+results = differential_evolution(get_score, bounds, integrality=(False, False, False, True, True, False))
+
+print(results)
+
+
+#femm.mo_getb(x, y) #Get the magnetic flux density associated with the point at (x,y). The return value is a list with two elements representing Bx and By for planar problems and Br and Bz for axisymmetric problems.
+#femm.mo_geth(x, y) #Get the magnetic field intensity associated with the point at (x,y). The return value is a list with two elements representing Hx and Hy for planar problems and Hr and Hz for axisymmetric problems
 
