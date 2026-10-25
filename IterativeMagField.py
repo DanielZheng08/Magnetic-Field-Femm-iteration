@@ -43,7 +43,6 @@ class ShieldingNodes():
     def move(self, dx, dy):
         self.x += dx
         self.y += dy
-        
 #Shielding points (sp = shielding points) INITIAL DIMENSIONS FROM BASE FEMM MODEL, draw rectangle tool not used incase of future geometry iteration thing
 sp1 = ShieldingNodes("sp1", -94.25, 5, 2, 72, 2, 2)
 sp2 = ShieldingNodes("sp2", -94.25, 77, 2, 72, 2, 2)
@@ -126,119 +125,129 @@ def change_turns(innerturns, outerturns):
     femm.mi_selectlabel(-100.15, 18.60)
     femm.mi_setblockprop("24 AWG", 1, 0, 'Outer Coil', 0, 2, outerturns)
     
+   
 ########################################ITERATIVE PART########################################
+'''PLAN: 
+    start from reference points and get sum of values of points in periodic spacings upwards until top of channel and we can use the values at left, middle, and right to see how good the mag field is
+    penalties and bonus points can then be given for bottom 5 middle points etc'''
 
-#DO LATER: THESE ARE INPUTTED (maybe idk if its necessary to input)
 middlerp = (-82, 32) #middle reference point
 leftrp = (-87.2, 32) #left reference point
 rightrp = (-76.8, 32) #right reference point
 
-#these retun a tuple (B_x, B_y)
-def get_fdM(y): 
-    '''finds the mag flux density at the centre of the channel at a given Y coordinate'''
-    return(femm.mo_getb(middlerp[0], y))
-def get_fdL(y): 
-    '''finds the mag flux density at the inner left of the channel at a given Y coordinate'''
-    return(femm.mo_getb(leftrp[0], y))
-def get_fdR(y):
-    '''finds the mag flux density at the inner right of the channel at a given Y coordinate'''
-    return(femm.mo_getb(rightrp[0], y))
-
-#NEED TO WORK ON X AND Y COMPONENTS DIFFERENCE
-def get_total_middlefd():
-    ycoords = np.linspace(32, 79.5, 1000) #CHECK 79.5 IS CORRECT FOR TOP OF THE CHANNEL
-    totalx = 0 
-    totaly = 0
-    for i in ycoords:
-        totalx += get_fdM(i)[0]
-        totaly += get_fdM(i)[1]
-    return(totalx, totaly)
-
-def get_total_sidefd():
-    ycoords = np.linspace(32, 79.5, 1000) #CHECK 79.5 IS CORRECT FOR TOP OF THE CHANNEL
-    totalx = 0 
-    totaly = 0
-    for i in ycoords:
-        totalx += (get_fdL(i)[0] + get_fdR(i)[0])
-        totaly += (get_fdL(i)[1] + get_fdR(i)[1])
-    return(totalx, totaly)
-
-def get_xuniformity():
-    '''finds root mean square error for the X component of flux density at 1000 Y coordinate'''
-    ycoords = np.linspace(32, 79.5, 1000) #CHECK 79.5 IS CORRECT FOR TOP OF THE CHANNEL
-    uniformity = 0
-    for i in ycoords:
-        lp = get_fdL(i)[0]
-        rp = get_fdR(i)[0]
-        mp = get_fdM(i)[0]
-        uniformity += np.sqrt(((lp-mp)**2 + (rp-mp)**2)/3)
-    return(uniformity)
-
-def get_yuniformity():
-    '''finds root mean square error for the Y component of flux density at 1000 y coordinates'''
-    ycoords = np.linspace(32, 79.5, 1000) #CHECK 79.5 IS CORRECT FOR TOP OF THE CHANNEL
-    uniformity = 0
-    for i in ycoords:
-        lp = get_fdL(i)[1]
-        rp = get_fdR(i)[1]
-        mp = get_fdM(i)[1]
-        uniformity += np.sqrt(((lp-mp)**2 + (rp-mp)**2)/3)
-    return(uniformity)
-
 leakrpL = (-90.26, 49.5)
 leakrpR = (-73.7, 49.5)
 
-def get_leak():
-    '''finds the total mag fluxs at 1000 y levels for the gaps between the mag screen and channel, returns a tupple for (X,Y) components'''
-    total_xleak = 0
-    total_yleak = 0
-    ycoords = np.linspace(leakrpL[1], sp1.swh-0.5, 1000) #sp1.swh so 1000 points only between the reference point and height of the shielding
+
+class hightangentangle(Exception):
+    pass
+
+def get_fdmag(y):
+    '''gets the magnitude of the flux density at a given y coordinate
+    outputs a tuple in the order of (left, middle, right)'''
+    middle = np.hypot(*femm.mo_getb(middlerp[0], y))  #'*' unpacks it
+    left = np.hypot(*femm.mo_getb(leftrp[0], y))
+    right = np.hypot(*femm.mo_getb(rightrp[0], y))
+    return(left, middle, right)
+
+def get_fd(y):
+    '''gets the x and y components of flux density at a given y coordinate
+    outputs a list of tupls in the order of (left, middle, right), for which each include a x and y component'''
+    middle = femm.mo_getb(middlerp[0], y)
+    left = femm.mo_getb(leftrp[0], y)
+    right = femm.mo_getb(rightrp[0], y)
+    return(left, middle, right)
+
+def get_leakmag(y):
+    '''gets the magnitude of the flux densirt at a given y level at the 'leak' points
+    outputs a tuple in order of (left, right)'''
+    Lleak = np.hypot(*femm.mo_getb(leakrpL[0], y))
+    Rleak = np.hypot(*femm.mo_getb(leakrpR[0], y))
+    return(Lleak, Rleak)
+
+def get_leak(y):
+    '''gets the X and Y components of the flux densirt at a given y level at the 'leak' points
+    outputs a tuple in order of (left, right), where each has x and y components'''
+    Lleak = femm.mo_getb(leakrpL[0], y)
+    Rleak = femm.mo_getb(leakrpR[0], y)
+    return(Lleak, Rleak)
+
+def check_uniformity(y): #root mean square error for mag field density at a specific y level, want closest to 0
+    '''finds the stabdard deviation at a given y level of the left and right points (middle is 0)
+    BEFORE RUNNING THE FEMM DESIGN MUST BE ANALYSED do RUN_FEMM()'''
+    lp, mp, rp = get_fdmag(y)
+    value = np.sqrt(((lp-mp)**2 + (rp-mp)**2)/3)
+    return(value)
+    
+    
+def check_tangent(y): #read page 11 of 'Topology, Shape and Parametric Optimization, a New Disruptive Way to Design Hall Effect Thrusters'
+    left = get_fd(y)[0]
+    right = get_fd(y)[2]
+    value = (np.tan((abs(left[0]))/abs((left[1]))))**2 + (np.tan((abs(right[0]))/abs((right[1]))))**2 
+    if value > 1:
+        raise hightangentangle("High tangent angle")
+    return(value)
+
+def dumbass_integration(f, low, high):
+    ycoords = np.linspace(low, high, 1000)
+    total = 0
     for i in ycoords:
-        Lleak = femm.mo_getb(leakrpL[0], i)
-        Rleak = femm.mo_getb(leakrpR[0], i)
-        total_xleak += (Rleak[0] + Lleak[0])
-        total_yleak += (Rleak[1] + Lleak[1])
-        return((total_xleak, total_yleak))
+        total += np.array(f(i)) #so works for all functions
+    return(total)
 
-##################################################################################################################
-
-runcount = 0
+########################################OPTIMISATION PART########################################
+runcount = 0 
 def get_score(x):
-    '''scores a given design using an objective function, lower score better
-    input: Shield thickness, shield height, shield gap, inner turns, outer turns, current'''
-    try: #normally run this, CHANGES VARIABLES
+    '''where objective function thingy is, lower score = more desirable
+    Order for input list: Shield thickness, shield height, shield gap, inner turns, outer turns, current'''
+    global runcount
+    runcount += 1 
+    try: #normally run this, CHANGES DIMENSIONS
         redraw_shielding(x[0], x[1], x[2])
         change_turns(x[3], x[4])
         change_current(x[5])
-    except ValueError: #when a valueerror is raised from a function like redraw_shielding() itll do this instead
-        return 1e6
     
-    print(check_nodes())
-    run_femm()
+        uniformity = dumbass_integration(check_uniformity, 32, 82)
+        leak = dumbass_integration(get_leakmag, 32, sp1.swh)
+        leak = np.sum(leak)
+        tangent = dumbass_integration(check_tangent, 40, 82)
+        fd = dumbass_integration(get_fdmag, 32, 120)
+        middlefd = fd[1]
+        
+        score = uniformity + leak + tangent - middlefd
+        
+        print("\n########################################")
+        print("Run: ", runcount)
+        print("########################################")
+        print("Shield thickness: ", sp1.swt)
+        print("Shield height: ", sp1.swh)
+        print("Shield gap: ", sp1.swg)
+        print("Inner coil turns: ", x[3])
+        print("Outer coil turns: ", x[4])
+        print("Current: ", x[5])
+        print("########################################")
+        print("Score: ", score)
+        return(score)    
     
-    uniformity = get_yuniformity() + get_xuniformity()
-    leakx = get_leak()[0]
-    leaky = get_leak()[1]
-    side_Xfd = get_total_sidefd()[0]
-    side_Yfd = get_total_sidefd()[1]
-    middle_Xfd = get_total_middlefd()[0]
-    middle_Yfd = get_total_middlefd()[1]
+    except (ValueError, hightangentangle): #when a valueerror is raised from a function like redraw_shielding() itll do this instead
+        print("\n Run", runcount, " rejected")
+        return 1e10 #large score so programme will not use this design 
 
-    score = uniformity + side_Xfd + side_Yfd + middle_Xfd + middle_Yfd + (1e6*leaky) + (1e6*leakx)
-    return(score)
-
-########################################OPTIMISATION PART########################################
 #Order: Shield thickness, shield height, shield gap, inner turns, outer turns, current
-bounds = [(0.1, 6.75), (0.1,80), (0.1, 6.75), (1,1000000), (1, 1000000), (1,10)]    
-
+bounds = [(0.1, 6.75), (49,80), (1, 6.75), (1,100000), (1, 100000), (1,10)]    
 def optimise():
-    results = differential_evolution(get_score, bounds, integrality=(False, False, False, True, True, False))
-    print(results)
-    
-    
-    
-    
-    
-    
-    
-    
+    results = differential_evolution(get_score, bounds, integrality=(False, False, False, True, True, False),popsize=10, maxiter=100, polish=False, disp=True)
+    print("\n\n")
+    print("################################### Optimisation Finished ###################################")
+    print("Nodes:")
+    print(check_nodes())
+    print("#############################################################################################")
+    print("Shield thickness =", results.x[0])
+    print("Shield height    =", results.x[1])
+    print("Shield gap       =", results.x[2])
+    print("Inner turns      =", (results.x[3]))
+    print("Outer turns      =", (results.x[4]))
+    print("Current          =", results.x[5])
+    print("#############################################################################################")
+    print("Best score: ", results.fun)
+
