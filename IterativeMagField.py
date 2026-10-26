@@ -3,12 +3,12 @@ Daniel Zheng, 17/10/26 meow!!
 '''
 ################[SET THESE BEFORE STARTING AND KEEP THE SAME]##################
 filepath = 'C:\\Uni work\\Electric Propulsions\\IterativeBase - Copy.fem'
-isolatorratio = (1.5) #bottom thickness / side thickness (NOT IN CODE RN), if changed baseline file may need to be manually editted
+isolatorratio = (1.5)
 ###############################################################################
 
 import femm
 import numpy as np
-from scipy.optimize import differential_evolution #not used yet will be used for iterative section later
+from scipy.optimize import differential_evolution
 
 def open_femm():
     femm.openfemm()
@@ -139,7 +139,7 @@ leakrpL = (-90.26, 49.5)
 leakrpR = (-73.7, 49.5)
 
 
-class hightangentangle(Exception):
+class highradialfd(Exception):
     pass
 
 def get_fdmag(y):
@@ -180,16 +180,16 @@ def check_uniformity(y): #root mean square error for mag field density at a spec
     return(value)
     
     
-def check_tangent(y): #read page 11 of 'Topology, Shape and Parametric Optimization, a New Disruptive Way to Design Hall Effect Thrusters'
+def check_radial(y): #read page 11 of 'Topology, Shape and Parametric Optimization, a New Disruptive Way to Design Hall Effect Thrusters'
     left = get_fd(y)[0]
     right = get_fd(y)[2]
-    value = (np.tan((abs(left[0]))/abs((left[1]))))**2 + (np.tan((abs(right[0]))/abs((right[1]))))**2 
-    if value > 1:
-        raise hightangentangle("High tangent angle")
+    value = (left[0])**2 + (right[0])**2
+    if value > 1:  
+        raise highradialfd("")
     return(value)
 
 def dumbass_integration(f, low, high):
-    ycoords = np.linspace(low, high, 1000)
+    ycoords = np.linspace(low, high, 100)
     total = 0
     for i in ycoords:
         total += np.array(f(i)) #so works for all functions
@@ -206,15 +206,16 @@ def get_score(x):
         redraw_shielding(x[0], x[1], x[2])
         change_turns(x[3], x[4])
         change_current(x[5])
+        run_femm()
     
         uniformity = dumbass_integration(check_uniformity, 32, 82)
         leak = dumbass_integration(get_leakmag, 32, sp1.swh)
         leak = np.sum(leak)
-        tangent = dumbass_integration(check_tangent, 40, 82)
+        radial = dumbass_integration(check_radial, 40, 82)
         fd = dumbass_integration(get_fdmag, 32, 120)
         middlefd = fd[1]
         
-        score = uniformity + leak + tangent - middlefd
+        score = uniformity + leak + radial - middlefd
         
         print("\n########################################")
         print("Run: ", runcount)
@@ -229,12 +230,12 @@ def get_score(x):
         print("Score: ", score)
         return(score)    
     
-    except (ValueError, hightangentangle): #when a valueerror is raised from a function like redraw_shielding() itll do this instead
-        print("\n Run", runcount, " rejected")
+    except (ValueError, highradialfd): #when a valueerror is raised from a function like redraw_shielding() itll do this instead
+        print("\n Run", runcount, "rejected")
         return 1e10 #large score so programme will not use this design 
 
 #Order: Shield thickness, shield height, shield gap, inner turns, outer turns, current
-bounds = [(0.1, 6.75), (49,80), (1, 6.75), (1,100000), (1, 100000), (1,10)]    
+bounds = [(0.1, 6.75), (60,77.95), (1, 6.75), (1,100000), (1, 100000), (1,10)]    
 def optimise():
     results = differential_evolution(get_score, bounds, integrality=(False, False, False, True, True, False),popsize=10, maxiter=100, polish=False, disp=True)
     print("\n\n")
