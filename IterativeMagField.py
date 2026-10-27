@@ -196,11 +196,11 @@ def get_score(x):
     global runcount
     runcount += 1 
     try: #normally run this, CHANGES DIMENSIONS
-        check_max_fd() #reject if too low (<0.02T)
         redraw_shielding(x[0], x[1], x[2])
         change_turns(x[3], x[4])
         change_current(x[5])
         run_femm()
+        check_max_fd() #reject if too low (<0.02T)
         
         region1_score = get_region1_score(*region1)
         region2_score = (get_region2_score(*region2L) + get_region2_score(*region2R))/2
