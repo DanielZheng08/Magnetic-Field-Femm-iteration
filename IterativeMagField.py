@@ -130,71 +130,64 @@ def change_turns(innerturns, outerturns):
 '''PLAN: 
     start from reference points and get sum of values of points in periodic spacings upwards until top of channel and we can use the values at left, middle, and right to see how good the mag field is
     penalties and bonus points can then be given for bottom 5 middle points etc'''
-
 middlerp = (-82, 32) #middle reference point
 leftrp = (-87.2, 32) #left reference point
 rightrp = (-76.8, 32) #right reference point
 
-leakrpL = (-90.26, 49.5)
-leakrpR = (-73.7, 49.5)
+#x1,x2,y1,y2
+region1 = (-82.5, -81.5, 78, 86)
+region2L = (-87.2, -86.2, 40, 82)
+region2R = (-77.8, -76.8, 40, 82)
 
-
-class highradialfd(Exception):
+class lowfluxdensity(Exception):
     pass
 
-def get_fdmag(y):
-    '''gets the magnitude of the flux density at a given y coordinate
-    outputs a tuple in the order of (left, middle, right)'''
-    middle = np.hypot(*femm.mo_getb(middlerp[0], y))  #'*' unpacks it
-    left = np.hypot(*femm.mo_getb(leftrp[0], y))
-    right = np.hypot(*femm.mo_getb(rightrp[0], y))
-    return(left, middle, right)
+def get_region2_score(x1,x2,y1,y2):   #imagine a rectangle: start left to right, bottom to top
+    '''Gets a regional score,not just a point like before, minimising Br at channel inner walls'''
+    xsegments = np.linspace(x1,x2,5)
+    ysegments = np.linspace(y1,y2,100)
+    totalr = 0
+    for i in xsegments:
+        for j in ysegments:
+            Br = femm.mo_getb(i, j)[0]
+            totalr += (Br/0.03)**2       #divide by 0.03 so design score later is better, dimensionless!
+    return(totalr/500)  #500 from 5*100, returns a tuple (Br, Bz)
 
-def get_fd(y):
-    '''gets the x and y components of flux density at a given y coordinate
-    outputs a list of tupls in the order of (left, middle, right), for which each include a x and y component'''
-    middle = femm.mo_getb(middlerp[0], y)
-    left = femm.mo_getb(leftrp[0], y)
-    right = femm.mo_getb(rightrp[0], y)
-    return(left, middle, right)
+def get_region1_score(x1,x2,y1,y2):   #imagine a rectangle: start left to right, bottom to top
+    '''Gets a regional score for how close to the target BR is it (0.03), best score is Bz is minimised'''
+    xsegments = np.linspace(x1,x2,5)
+    ysegments = np.linspace(y1,y2,100)
+    totalr = 0
+    totalz = 0
+    for i in xsegments:
+        for j in ysegments:
+            Br, Bz = femm.mo_getb(i, j)
+            totalz += (Bz/0.03)**2
+            totalr += ((Br-0.03)/0.03)**2       #divide by 0.03 so design score later is better, dimensionless!
+    return((totalr/500)+(totalz/500)) 
 
-def get_leakmag(y):
-    '''gets the magnitude of the flux densirt at a given y level at the 'leak' points
-    outputs a tuple in order of (left, right)'''
-    Lleak = np.hypot(*femm.mo_getb(leakrpL[0], y))
-    Rleak = np.hypot(*femm.mo_getb(leakrpR[0], y))
-    return(Lleak, Rleak)
-
-def get_leak(y):
-    '''gets the X and Y components of the flux densirt at a given y level at the 'leak' points
-    outputs a tuple in order of (left, right), where each has x and y components'''
-    Lleak = femm.mo_getb(leakrpL[0], y)
-    Rleak = femm.mo_getb(leakrpR[0], y)
-    return(Lleak, Rleak)
-
-def check_uniformity(y): #root mean square error for mag field density at a specific y level, want closest to 0
-    '''finds the stabdard deviation at a given y level of the left and right points (middle is 0)
-    BEFORE RUNNING THE FEMM DESIGN MUST BE ANALYSED do RUN_FEMM()'''
-    lp, mp, rp = get_fdmag(y)
-    value = np.sqrt(((lp-mp)**2 + (rp-mp)**2)/3)
-    return(value)
-    
-    
-def check_radial(y): #read page 11 of 'Topology, Shape and Parametric Optimization, a New Disruptive Way to Design Hall Effect Thrusters'
-    left = get_fd(y)[0]
-    right = get_fd(y)[2]
-    value = (left[0])**2 + (right[0])**2
-    if value > 1:  
-        raise highradialfd("")
-    return(value)
-
-def dumbass_integration(f, low, high):
-    ycoords = np.linspace(low, high, 100)
-    total = 0
+def check_max_fd():
+    '''makes sure the flux is atleast 0.02T (documentation said 0.03T max so 0.02 for now) and rejects design if it isnt'''
+    ycoords = np.linspace(78, 86, 50)
+    values = []
     for i in ycoords:
-        total += np.array(f(i)) #so works for all functions
-    return(total)
+        Br, Bz = femm.mo_getb(-82, i)
+        values.append(abs(Br))
+    if max(values) < 0.02:
+        raise lowfluxdensity()
 
+def get_parallel_score(): #if field lines stay parallel to the channel wall
+    '''Measures how parallel flux is to the channel and gives a penalty if it isnt perfectly parallel'''
+    total = 0
+    ycoords = np.linspace(40, 79.5, 100)
+    for i in ycoords:
+        Lflux = femm.mo_getb(leftrp[0], i)
+        Rflux = femm.mo_getb(rightrp[0], i)
+        bonus = ((abs(Lflux[1])/np.hypot(*Lflux)) + (abs(Rflux[1])/np.hypot(*Rflux))) / 2 #find cos from trig but we leave in tersmf of cos so its between 0 and 1
+        total += bonus
+    return(1 - (total/100))  #so 0 best score, max penalty = 1
+        
+    
 ########################################OPTIMISATION PART########################################
 runcount = 0 
 def get_score(x):
@@ -203,19 +196,21 @@ def get_score(x):
     global runcount
     runcount += 1 
     try: #normally run this, CHANGES DIMENSIONS
+        check_max_fd() #reject if too low (<0.02T)
         redraw_shielding(x[0], x[1], x[2])
         change_turns(x[3], x[4])
         change_current(x[5])
         run_femm()
-    
-        uniformity = dumbass_integration(check_uniformity, 32, 82)
-        leak = dumbass_integration(get_leakmag, 32, sp1.swh)
-        leak = np.sum(leak)
-        radial = dumbass_integration(check_radial, 40, 82)
-        fd = dumbass_integration(get_fdmag, 32, 120)
-        middlefd = fd[1]
         
-        score = uniformity + leak + radial - middlefd
+        region1_score = get_region1_score(*region1)
+        region2_score = (get_region2_score(*region2L) + get_region2_score(*region2R))/2
+        parallel = get_parallel_score()
+        
+        penalty = parallel #add others later?
+        
+        score = region1_score + region2_score + penalty
+
+        #score = uniformity + (5*normalval) - (10*depthscore) + (5*fd_error) # - middlefdR + middlefdZ
         
         print("\n########################################")
         print("Run: ", runcount)
@@ -226,16 +221,21 @@ def get_score(x):
         print("Inner coil turns: ", x[3])
         print("Outer coil turns: ", x[4])
         print("Current: ", x[5])
+        
+        print("region1_score: ", region1_score)
+        print("region2_score: ", region2_score)
+        print("Stickiness penalty: ", stickiness)
         print("########################################")
         print("Score: ", score)
+        
         return(score)    
     
-    except (ValueError, highradialfd): #when a valueerror is raised from a function like redraw_shielding() itll do this instead
+    except (ValueError, lowfluxdensity): #when a valueerror is raised from a function like redraw_shielding() itll do this instead
         print("\n Run", runcount, "rejected")
         return 1e10 #large score so programme will not use this design 
 
 #Order: Shield thickness, shield height, shield gap, inner turns, outer turns, current
-bounds = [(0.1, 6.75), (60,77.95), (1, 6.75), (1,100000), (1, 100000), (1,10)]    
+bounds = [(0.5, 6.75), (49.5,72.95), (0.5, 6.75), (1,100000), (1, 100000), (1,10)]    
 def optimise():
     results = differential_evolution(get_score, bounds, integrality=(False, False, False, True, True, False),popsize=10, maxiter=100, polish=False, disp=True)
     print("\n\n")
@@ -248,7 +248,7 @@ def optimise():
     print("Shield gap       =", results.x[2])
     print("Inner turns      =", (results.x[3]))
     print("Outer turns      =", (results.x[4]))
-    print("Current          =", results.x[5])
+    print("Current          =", results.x[5]) 
     print("#############################################################################################")
     print("Best score: ", results.fun)
 
