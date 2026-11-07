@@ -67,15 +67,6 @@ class MagCircuitChamfer():
     def move(self, dx, dy):
         self.x += dx
         self.y += dy
-
-#Chamfer points (points that make up the mag screening as well!)
-#CHANGE TS
-leftwidth = MagCircuitChamfer("leftwidth", -93.25, 77, 1, 10, "Screen")
-leftlength = MagCircuitChamfer("leftlength", -92.25, 67, 1,10, "Screen")
-rightwidth = MagCircuitChamfer("rightwidth", -70.75, 77, 1, 10, "Screen")
-rightlength = MagCircuitChamfer("rightlength", -69.75, 67, 1, 10, "Screen")
-
-#FOR TOP PLATE 'which' IS "top plate"!!
     
 #Shielding points (sp = shielding points) INITIAL DIMENSIONS FROM BASE FEMM MODEL, draw rectangle tool not used incase of future geometry iteration thing
 sp1 = ShieldingNodes("sp1", -37.995, -21, 42, 3, 1)
@@ -104,6 +95,104 @@ tpp10 = PlateNodes("tpp5", -0, 24, "in", 2, 18)
 movablenodes = [tpp2,tpp3,tpp4,tpp7,tpp8,tpp9]
 outerplatenodes = [tpp1,tpp2,tpp3,tpp4,tpp5]
 innerplatenodes = [tpp6,tpp7,tpp8,tpp9,tpp10]
+
+#Chamfer points (points that make up the mag screening as well!)
+#S for screen P for plate
+Pleftwidth = MagCircuitChamfer("leftwidth", -36, 21, 1, 10, "Screen")
+Pleftlength = MagCircuitChamfer("leftlength", -38, 11, 1,10, "Screen")
+Prightwidth = MagCircuitChamfer("rightwidth", -17, 21, 1, 10, "Screen")
+Prightlength = MagCircuitChamfer("rightlength", -15, 11, 1, 10, "Screen")
+platechamfernodes = [Pleftwidth, Pleftlength, Prightwidth, Prightlength]
+
+Sleftwidth = MagCircuitChamfer("leftwidth", -36, 21, 1, 10, "Screen")
+Sleftlength = MagCircuitChamfer("leftlength", -38, 11, 1,10, "Screen")
+Srightwidth = MagCircuitChamfer("rightwidth", -17, 21, 1, 10, "Screen")
+Srightlength = MagCircuitChamfer("rightlength", -15, 11, 1, 10, "Screen")
+screenchamfernodes = [Sleftwidth, Sleftlength, Srightwidth, Srightlength]
+
+def chamfer_top_plate(width, length):
+    if width < 0 or length < 0:
+        raise ValueError("Must be more than 0")
+    if width > abs(tpp3.y-tpp4.y) or length > abs(tpp4.x-tpp5.x):
+        raise ValueError("cant do that twin")
+        
+    femm.mi_clearselected()
+    Pleftwidth.x = tpp3.x
+    Pleftwidth.y = tpp3.y - width
+    Pleftlength.x = tpp4.x - length
+    Pleftlength.y = tpp4.y
+
+    Prightwidth.x = tpp8.x
+    Prightwidth.y = tpp8.y - width
+    Prightlength.x = tpp7.x + length
+    Prightlength.y = tpp7.y
+    
+    for i in platechamfernodes:
+        femm.mi_addnode(i.x,i.y)
+        
+    femm.mi_selectnode(tpp4.x, tpp4.y)
+    femm.mi_selectnode(tpp7.x, tpp7.y)
+    femm.mi_deleteselectednodes()
+    
+    femm.mi_addsegment(Pleftwidth.x, Pleftwidth.y, Pleftlength.x, Pleftlength.y)
+    femm.mi_addsegment(Prightwidth.x, Prightwidth.y, Prightlength.x, Prightlength.y)
+
+def chamfer_screening(width, length):
+    femm.mi_clearselected()
+    Sleftwidth.x = sp3.x - width
+    Sleftwidth.y = sp3.y 
+    Sleftlength.x = sp2.x
+    Sleftlength.y = sp2.y - length
+    
+    Srightwidth.x = sp8.x + width
+    Srightwidth.y = sp8.y 
+    Srightlength.x = sp9.x
+    Srightlength.y = sp9.y - length
+    
+    for i in screenchamfernodes:
+        femm.mi_addnode(i.x,i.y)
+    
+    femm.mi_selectnode(sp2.x, sp2.y)
+    femm.mi_selectnode(sp9.x, sp9.y)
+    femm.mi_deleteselectednodes()
+    
+    femm.mi_addsegment(Sleftwidth.x, Sleftwidth.y, Sleftlength.x, Sleftlength.y)
+    femm.mi_addsegment(Srightwidth.x, Srightwidth.y, Srightlength.x, Srightlength.y)
+    
+def undo_chamfers():
+    femm.mi_clearselected()
+    #Screen
+    femm.mi_selectnode(Sleftwidth.x, Sleftwidth.y)
+    femm.mi_selectnode(Sleftlength.x, Sleftlength.y)
+    femm.mi_selectnode(Srightwidth.x, Srightwidth.y)
+    femm.mi_selectnode(Srightlength.x, Srightlength.y)
+    femm.mi_deleteselectednodes()
+    
+    femm.mi_addnode(sp2.x, sp2.y)
+    femm.mi_addnode(sp9.x, sp9.y)
+    
+    femm.mi_addsegment(sp1.x, sp1.y, sp2.x, sp2.y)
+    femm.mi_addsegment(sp2.x, sp2.y, sp3.x, sp3.y)
+    femm.mi_addsegment(sp8.x, sp8.y, sp9.x, sp9.y)
+    femm.mi_addsegment(sp9.x, sp9.y, sp10.x, sp10.y)
+    
+    #Plate
+    femm.mi_selectnode(Pleftwidth.x, Pleftwidth.y)
+    femm.mi_selectnode(Pleftlength.x, Pleftlength.y)
+    femm.mi_selectnode(Prightwidth.x, Prightwidth.y)
+    femm.mi_selectnode(Prightlength.x, Prightlength.y)
+    femm.mi_deleteselectednodes()
+    
+    femm.mi_addnode(tpp4.x, tpp4.y)
+    femm.mi_addnode(tpp7.x, tpp7.y)
+    
+    femm.mi_addsegment(tpp3.x, tpp3.y, tpp4.x, tpp4.y)
+    femm.mi_addsegment(tpp4.x, tpp4.y, tpp5.x, tpp5.y)
+    femm.mi_addsegment(tpp7.x, tpp7.y, tpp8.x, tpp8.y)
+    femm.mi_addsegment(tpp6.x, tpp6.y, tpp7.x, tpp7.y)
+    
+    
+    
 
 def redraw_top_plate(outerthickness, innerthickness, outerlength, innerlength):
     if outerthickness<0 or innerthickness<0:
@@ -226,6 +315,7 @@ class lowpenetration(Exception):
     pass
 
 def nd_target(max_value, y, y_peak, constant): #constant = 2c^2, from general normal distribution form 
+    '''just the normal distribution, purpose of this function is to scale the target flux density at differeny y coordinates'''
     return (max_value * np.exp(-(y - y_peak)**2 / constant))
 
 #x1, x2, y1, y2, imagine the rectangle formed by these limits
@@ -235,6 +325,7 @@ region2R = (-22.05, -22.5, 1, 26)
 region3 = () #we might actually not need this
 
 def get_region1_score(x1,x2,y1,y2):
+    '''maximise Br and minimises Bz, returning a dimensionless score'''
     xsegments = np.linspace(x1,x2,3)
     ysegments = np.linspace(y1,y2,50)
     scoreR = 0 
@@ -242,12 +333,13 @@ def get_region1_score(x1,x2,y1,y2):
     for i in xsegments:
         for j in ysegments:
             Br, Bz = femm.mo_getb(i, j)
-            target = nd_target(0.03, j, region1[3], 162) #TEST THIS LAST VARIABLE (2c^2 value). thought process for 162: channel width=9 so 2c^2 = 2(9^2)
+            target = nd_target(0.03, j, region1[3], 200) #TEST THIS LAST VARIABLE (2c^2 value). thought process for 162: channel width=9 so 2c^2 = 2(9^2)
             scoreR += ((Br-target)/0.03)**2
             scoreZ += (Bz/0.03)**2
     return((scoreR/150 + scoreZ/150)/2)
 
 def get_region2_score(x1,x2,y1,y2):
+    '''minimises Br, returning a dimensionless score'''
     xsegments = np.linspace(x1,x2,3)
     ysegments = np.linspace(y1,y2,50)
     scoreR = 0 #idk if we need to maximise Bz here, prob not right? as region1 maximised
@@ -257,8 +349,21 @@ def get_region2_score(x1,x2,y1,y2):
             scoreR += (Br/0.03)**2
     return(scoreR/150)
 
+def get_parallel_score(): #if field lines stay parallel to the channel wall
+    '''Measures how parallel flux is to the channel and gives a penalty if it isnt perfectly parallel'''
+    total = 0
+    ycoords = np.linspace(1, 25, 50)
+    for i in ycoords:
+        Lflux = femm.mo_getb(leftrp[0], i)
+        Rflux = femm.mo_getb(rightrp[0], i)
+        bonus = ((abs(Lflux[1])/np.hypot(*Lflux)) + (abs(Rflux[1])/np.hypot(*Rflux))) / 2 #find cos from trig but we leave in tersmf of cos so its between 0 and 1
+        total += bonus
+    return(1 - (total/50))
 ########################################OPTIMISATION PART########################################
 runcount = 0 
+
+#ISSUE: DIFFERENTIAL EVOLUTION CHANGES THE VALUES SO WHEN IT TRIED TO UNDO CHAMFER TI FUCKS UP}
+
 def get_score(x):
     '''where objective function thingy is, lower score = more desirable
     Order for input list: Shield thickness, shield height, shield gap, inner turns, outer turns, current'''
@@ -266,15 +371,17 @@ def get_score(x):
     runcount += 1 
     try: #normally run this, CHANGES DIMENSIONS
         redraw_shielding(x[0], x[1], x[2])
-        redraw_top_plate(x[6], x[7], x[8], x[9])
+        chamfer_screening(x[10], x[11])
+        chamfer_top_plate(x[12], x[13])
         change_turns(x[3], x[4])
         change_current(x[5])
         run_femm()
         
+        parallel = get_parallel_score()
         region1_score = get_region1_score(*region1)
         region2_score = (get_region2_score(*region2L) + get_region2_score(*region2R))/2
         
-        score = region1_score + region2_score
+        score = region1_score + region2_score + parallel
 
         print("\n########################################")
         print("Run: ", runcount)
@@ -291,16 +398,17 @@ def get_score(x):
         print("########################################")
         print("Score: ", score)
         
+        undo_chamfers()
         return(score)    
     
     except (ValueError, lowfluxdensity, lowpenetration): #when a valueerror is raised from a function like redraw_shielding() itll do this instead
         print("\n Run", runcount, "rejected")
         return 1e10 #large score so programme will not use this design 
 
-#Order: Shield thickness, shield height, shield gap, inner turns, outer turns, current, outerthickness, innerthickness, outerlength, innerlength
-bounds = [(0.5, 2.99), (13,44.95), (0.5, 1), (1,10000), (1, 10000), (1,10), (0.5,10), (0.5,10), (7, 10.9), (15,18.9)]    
+#Order: Shield thickness, shield height, shield gap, inner turns, outer turns, current, outerthickness, innerthickness, outerlength, innerlength, screenchamferwidth, screenchamferlength, platechamferwidth, platechamferlength
+bounds = [(0.5, 2.99), (13,44.95), (0.5, 1), (1,10000), (1, 10000), (1,10), (0.5,10), (0.5,10), (7, 10.9), (15,18.9), (0.1,  (abs(sp3.x - sp2.x))), (0.1, (abs(sp1.swh-21))), (0.1, (abs(tpp3.y-tpp4.y))), (0.1,(abs(tpp4.x-tpp5.x)))]   
 def optimise():
-    results = differential_evolution(get_score, bounds, integrality=(False, False, False, True, True, False, False, False, False, False),popsize=10, maxiter=100, polish=False, disp=True)
+    results = differential_evolution(get_score, bounds, integrality=(False, False, False, True, True, False, False, False, False, False, False, False, False, False),popsize=10, maxiter=100, polish=False, disp=True)
     print("\n\n")
     print("################################### Optimisation Finished ###################################")
     print("Nodes:")
