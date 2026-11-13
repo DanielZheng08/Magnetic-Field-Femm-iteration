@@ -2,7 +2,7 @@
 Daniel Zheng, 17/10/26
 '''
 ################[SET THESE BEFORE STARTING AND KEEP THE SAME]##################
-filepath = "C:\\Uni work\\Electric Propulsions\\IterativeBase - Copy.fem"
+filepath = "C:\\Uni work\Electric Propulsions\\IterativeBase - Copy.fem"
 isolatorratio = (1.5)
 ###############################################################################
 
@@ -114,13 +114,53 @@ Srightwidth = MagCircuitChamfer("rightwidth", -17, 21, 1, 10, "Screen")
 Srightlength = MagCircuitChamfer("rightlength", -15, 11, 1, 10, "Screen")
 screenchamfernodes = [Sleftwidth, Sleftlength, Srightwidth, Srightlength]
 
-def chamfer_top_plate(width, length):
-    if width < 0 or length < 0:
-        raise ValueError("Must be more than 0")
-    if width > abs(tpp3.y-tpp4.y)-0.01 or length > abs(tpp4.x-tpp5.x)-0.01 or width > abs(tpp8.y-tpp7.y)-0.01 or length > abs(tpp6.x-tpp7.x)-0.01:
-        raise ValueError("chamfer too deep")
+def chamfer_screening(width, length):
+    max_width = min(abs(sp3.x - sp2.x), abs(sp9.x - sp8.x))-0.01
+    max_length = min(abs(sp2.y - sp1.y), abs(sp9.y - sp10.y))-0.01
+    if width <= 0 or length <= 0:
+        raise ValueError("Screen chamfer dimensions must be positive")
+    if width > max_width or length > max_length:
+        raise ValueError("Screen chamfer too deep")
 
     femm.mi_clearselected()
+    
+    Sleftwidth.x = sp3.x - width
+    Sleftwidth.y = sp3.y
+    Sleftlength.x = sp2.x
+    Sleftlength.y = sp2.y - length
+
+    Srightwidth.x = sp8.x + width
+    Srightwidth.y = sp8.y
+    Srightlength.x = sp9.x
+    Srightlength.y = sp9.y - length
+
+    for i in screenchamfernodes:
+        femm.mi_addnode(i.x, i.y)
+
+    femm.mi_selectnode(sp2.x, sp2.y)
+    femm.mi_selectnode(sp9.x, sp9.y)
+    femm.mi_deleteselectednodes()
+
+    femm.mi_addsegment(sp1.x, sp1.y, Sleftlength.x, Sleftlength.y)
+    femm.mi_addsegment(Sleftlength.x, Sleftlength.y, Sleftwidth.x, Sleftwidth.y)
+    femm.mi_addsegment(Sleftwidth.x, Sleftwidth.y, sp3.x, sp3.y)
+
+    femm.mi_addsegment(sp8.x, sp8.y, Srightwidth.x, Srightwidth.y)
+    femm.mi_addsegment(Srightwidth.x, Srightwidth.y, Srightlength.x, Srightlength.y)
+    femm.mi_addsegment(Srightlength.x, Srightlength.y, sp10.x, sp10.y)
+
+    femm.mi_clearselected()
+
+
+def chamfer_top_plate(width, length):
+    if width <= 0 or length <= 0:
+        raise ValueError("Plate chamfer dimensions must be positive")
+    max_width = min(abs(tpp3.y - tpp4.y), abs(tpp8.y - tpp7.y)) - 0.01
+    max_length = min(abs(tpp4.x - tpp5.x), abs(tpp6.x - tpp7.x)) - 0.01
+    if width > max_width or length > max_length:
+        raise ValueError("Plate chamfer too deep")
+    femm.mi_clearselected()
+
     Pleftwidth.x = tpp3.x
     Pleftwidth.y = tpp3.y - width
     Pleftlength.x = tpp4.x - length
@@ -130,39 +170,24 @@ def chamfer_top_plate(width, length):
     Prightwidth.y = tpp8.y - width
     Prightlength.x = tpp7.x + length
     Prightlength.y = tpp7.y
-    
-    for i in platechamfernodes:
-        femm.mi_addnode(i.x,i.y)
-        
+
+    for node in platechamfernodes:
+        femm.mi_addnode(node.x, node.y)
+
     femm.mi_selectnode(tpp4.x, tpp4.y)
     femm.mi_selectnode(tpp7.x, tpp7.y)
     femm.mi_deleteselectednodes()
-    
-    femm.mi_addsegment(Pleftwidth.x, Pleftwidth.y, Pleftlength.x, Pleftlength.y)
-    femm.mi_addsegment(Prightwidth.x, Prightwidth.y, Prightlength.x, Prightlength.y)
-    femm.mi_clearselected()
 
-def chamfer_screening(width, length):
-    femm.mi_clearselected()
-    Sleftwidth.x = sp3.x - width
-    Sleftwidth.y = sp3.y 
-    Sleftlength.x = sp2.x
-    Sleftlength.y = sp2.y - length
-    
-    Srightwidth.x = sp8.x + width
-    Srightwidth.y = sp8.y 
-    Srightlength.x = sp9.x
-    Srightlength.y = sp9.y - length
-    
-    for i in screenchamfernodes:
-        femm.mi_addnode(i.x,i.y)
-    
-    femm.mi_selectnode(sp2.x, sp2.y)
-    femm.mi_selectnode(sp9.x, sp9.y)
-    femm.mi_deleteselectednodes()
-    
-    femm.mi_addsegment(Sleftwidth.x, Sleftwidth.y, Sleftlength.x, Sleftlength.y)
-    femm.mi_addsegment(Srightwidth.x, Srightwidth.y, Srightlength.x, Srightlength.y)
+    # Outer plate chamfer.
+    femm.mi_addsegment(tpp3.x, tpp3.y, Pleftwidth.x, Pleftwidth.y)
+    femm.mi_addsegment(Pleftwidth.x, Pleftwidth.y, Pleftlength.x, Pleftlength.y)
+    femm.mi_addsegment(Pleftlength.x, Pleftlength.y,tpp5.x, tpp5.y)
+
+    # Inner plate chamfer.
+    femm.mi_addsegment(tpp6.x, tpp6.y,Prightlength.x, Prightlength.y)
+    femm.mi_addsegment(Prightlength.x, Prightlength.y, Prightwidth.x, Prightwidth.y)
+    femm.mi_addsegment(Prightwidth.x, Prightwidth.y, tpp8.x, tpp8.y)
+
     femm.mi_clearselected()
     
 def undo_screen_chamfers():
@@ -198,8 +223,6 @@ def undo_plate_chamfers():
     femm.mi_addsegment(tpp7.x, tpp7.y, tpp8.x, tpp8.y)
 
     femm.mi_clearselected()
-    
-    
 
 def redraw_top_plate(outerthickness, innerthickness, outerlength, innerlength):
     if outerthickness<0 or innerthickness<0:
@@ -346,7 +369,7 @@ def get_region1_score(x1,x2,y1,y2):
     for i in xsegments:
         for j in ysegments:
             Br, Bz = femm.mo_getb(i, j)
-            target = nd_target(0.03, j, region1[3], 150) #TEST THIS LAST VARIABLE (2c^2 value)
+            target = nd_target(0.03, j, region1[3], 10) #TEST THIS LAST VARIABLE (2c^2 value)
             scoreR += ((Br-target)/0.03)**2
             scoreZ += (Bz/0.03)**2
     return((scoreR/150 + scoreZ/150)/2)
@@ -376,7 +399,19 @@ def check_max_fd():
         values.append(abs(Br))
     if max(values) < 0.02:   #maybe 0.01? max field strength
         raise lowfluxdensity()
-        
+
+def get_penetration_depth_score():
+    '''gives a bonus for depth reached'''
+    ycoords = np.linspace(26, -4, 25)   #y coordinates 26 to -4 (channel)
+    depth = 0
+    for i in ycoords:
+        Br, Bz = femm.mo_getb(middlerp[0], i)
+        if abs(Br) >= 0.005:
+            depth = 26 - i
+        else:
+            break
+    return(1 - (depth/39.5))
+
 ########################################OPTIMISATION PART########################################
 runcount = 0 
 
@@ -391,7 +426,7 @@ def get_score(x):
     try:
         # Change magnetic circuit geometry
         redraw_screen(x[0], x[1], x[2])
-        redraw_top_plate(x[6], x[7], x[8], x[9])
+        #redraw_top_plate(x[6], x[7], x[8], x[9])
         chamfer_screening(x[10], x[11])
         screen_chamfered = True
         chamfer_top_plate(x[12], x[13])
@@ -430,15 +465,15 @@ def get_score(x):
         print("Run", runcount, "rejected:", repr(e))
         return 1e10
     finally:
-        if screen_chamfered:
-            undo_screen_chamfers()
         if plate_chamfered:
             undo_plate_chamfers()
+        if screen_chamfered:
+            undo_screen_chamfers()
 
 #Order: Shield thickness, shield height, shield gap, inner turns, outer turns, current, outerthickness, innerthickness, outerlength, innerlength, screenchamferwidth, screenchamferlength, platechamferwidth, platechamferlength
-bounds = [(0.5, 2.99), (30,44.95), (0.1, 1), (1,1000), (1, 1000), (1,10), (0.5,10), (0.5,10), (7.02, 10.9), (15.02,18.9), (0.1,  (abs(sp3.x - sp2.x)-0.01)), (0.1, (abs(sp1.swh-21))), (0.1, (abs(tpp3.y-tpp4.y)-0.01)), (0.1,(abs(tpp4.x-tpp5.x))-0.01)]   
+bounds = [(0.5, 2.99), (30,44.95), (0.1, 1), (1,1000), (1, 1000), (1,10), (0.5,0.5), (0.5,0.5), (7.02, 7.02), (15.02,15.02), (0.1,  (abs(sp3.x - sp2.x)-0.01)), (0.1, (abs(sp1.swh-21))), (0.1, (abs(tpp3.y-tpp4.y)-0.01)), (0.1,(abs(tpp4.x-tpp5.x))-0.01)]  
 def optimise():
-    results = differential_evolution(get_score, bounds, integrality=(False, False, False, True, True, False, False, False, False, False, False, False, False, False),popsize=15, maxiter=200, polish=True, disp=True)
+    results = differential_evolution(get_score, bounds, integrality=(False, False, False, True, True, False, False, False, False, False, False, False, False, False),popsize=15, maxiter=150, polish=True, disp=True)
     print("\n\n")
     print("################################### Optimisation Finished ###################################")
     print("Nodes:")
