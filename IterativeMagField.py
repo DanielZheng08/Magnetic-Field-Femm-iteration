@@ -369,7 +369,7 @@ def get_region1_score(x1,x2,y1,y2):
     for i in xsegments:
         for j in ysegments:
             Br, Bz = femm.mo_getb(i, j)
-            target = nd_target(0.03, j, region1[3], 10) #TEST THIS LAST VARIABLE (2c^2 value)
+            target = nd_target(0.03, j, region1[3], 300) #TEST THIS LAST VARIABLE (2c^2 value)
             scoreR += ((Br-target)/0.03)**2
             scoreZ += (Bz/0.03)**2
     return((scoreR/150 + scoreZ/150)/2)
@@ -384,6 +384,20 @@ def get_region2_score(x1, x2, y1, y2):
     for i in xsegments:
         for j in ysegments:
             Br, Bz = femm.mo_getb(i, j)
+            # minimise radial field
+            scoreR += (Br/0.03)**2
+            # minimise axial field
+            scoreZ += (Bz/0.03)**2
+    return (scoreR/150 + scoreZ/150)/2
+
+def get_region2_score_lite(x1, x2, y1):
+    '''for penetration test thing so processing not as long'''
+    xsegments = np.linspace(x1, x2, 3)
+    scoreR = 0
+    scoreZ = 0
+
+    for i in xsegments:
+            Br, Bz = femm.mo_getb(i, y1)
             # minimise radial field
             scoreR += (Br/0.03)**2
             # minimise axial field
@@ -405,12 +419,13 @@ def get_penetration_depth_score():
     ycoords = np.linspace(26, -4, 25)   #y coordinates 26 to -4 (channel)
     depth = 0
     for i in ycoords:
+        score2 = get_region2_score_lite(-30.95, -30.5, i)
         Br, Bz = femm.mo_getb(middlerp[0], i)
-        if abs(Br) >= 0.005:
+        if abs(Br) >= 0.005 and score2 < 0.5:
             depth = 26 - i
         else:
             break
-    return(1 - (depth/39.5))
+    return(1 - (depth/30))
 
 ########################################OPTIMISATION PART########################################
 runcount = 0 
@@ -441,8 +456,11 @@ def get_score(x):
         # Calculate objective scores
         region1_score = get_region1_score(*region1)
         region2_score = (get_region2_score(*region2L) + get_region2_score(*region2R))/2
+        
+        #penetration = get_penetration_depth_score()
+        
         # Total objective
-        score = region1_score + region2_score
+        score = region1_score + region2_score# + penetration
 
         # Display results
         print("########################################")
