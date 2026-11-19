@@ -4,7 +4,7 @@ Daniel Zheng, 17/10/26
 ################[SET THESE BEFORE STARTING]##################
 filepath = r"C:\Uni work\Electric Propulsions\IterativeBase - Copy.fem"
 isolatorratio = 1.5
-c = 100
+c = 150
 targetflux = 0.025
 ypeak = 30.5
 ymin = -4
@@ -112,7 +112,6 @@ movablenodes = [tpp2, tpp3, tpp4, tpp7, tpp8, tpp9]
 outerplatenodes = [tpp1, tpp2, tpp3, tpp4, tpp5]
 innerplatenodes = [tpp6, tpp7, tpp8, tpp9, tpp10]
 
-
 #plate chamfer points
 Pleftwidth = MagCircuitChamfer("leftwidth", 36, 21, 1, 10, "Plate")
 Pleftlength = MagCircuitChamfer("leftlength", 38, 11, 1, 10, "Plate")
@@ -126,7 +125,6 @@ Sleftlength = MagCircuitChamfer("leftlength", 38, 11, 1, 10, "Screen")
 Srightwidth = MagCircuitChamfer("rightwidth", 17, 21, 1, 10, "Screen")
 Srightlength = MagCircuitChamfer("rightlength", 15, 11, 1, 10, "Screen")
 screenchamfernodes = [Sleftwidth, Sleftlength, Srightwidth, Srightlength]
-
 
 def chamfer_screening(width, length):
     max_width = min(abs(sp3.x - sp2.x), abs(sp9.x - sp8.x)) - 0.01
@@ -165,7 +163,6 @@ def chamfer_screening(width, length):
     femm.mi_addsegment(Srightlength.x, Srightlength.y, sp10.x, sp10.y)
 
     femm.mi_clearselected()
-
 
 def chamfer_top_plate(width, length):
     if width <= 0 or length <= 0:
@@ -208,7 +205,6 @@ def chamfer_top_plate(width, length):
 
     femm.mi_clearselected()
 
-
 def undo_screen_chamfers():
     femm.mi_clearselected()
     femm.mi_selectnode(Sleftwidth.x, Sleftwidth.y)
@@ -224,7 +220,6 @@ def undo_screen_chamfers():
     femm.mi_addsegment(sp2.x, sp2.y, sp3.x, sp3.y)
     femm.mi_addsegment(sp8.x, sp8.y, sp9.x, sp9.y)
     femm.mi_addsegment(sp9.x, sp9.y, sp10.x, sp10.y)
-
 
 def undo_plate_chamfers():
     femm.mi_clearselected()
@@ -243,7 +238,6 @@ def undo_plate_chamfers():
     femm.mi_addsegment(tpp7.x, tpp7.y, tpp8.x, tpp8.y)
 
     femm.mi_clearselected()
-
 
 def redraw_top_plate(outerthickness, innerthickness, outerlength, innerlength):
     if outerthickness < 0 or innerthickness < 0:
@@ -291,7 +285,6 @@ def redraw_top_plate(outerthickness, innerthickness, outerlength, innerlength):
         i.thickness = innerthickness
 
     femm.mi_clearselected()
-
 
 def redraw_screen(shieldthickness, shieldheight, shieldgap):
     if shieldthickness < 0 or shieldheight < 0 or shieldgap < 0:
@@ -347,7 +340,6 @@ def redraw_screen(shieldthickness, shieldheight, shieldgap):
     femm.mi_addsegment(sp1.x, sp1.y, sp10.x, sp10.y)
     femm.mi_clearselected()
 
-
 def change_current(newcurrent):
     if newcurrent < 0:
         raise ValueError("Value must be more than 0")
@@ -355,7 +347,6 @@ def change_current(newcurrent):
     femm.mi_modifycircprop("Outer Coil", 1, newcurrent)
     femm.mi_modifycircprop("Inner Coil", 1, newcurrent)
     femm.mi_clearselected()
-
 
 def change_turns(innerturnsaddition, outerturns):
     if innerturnsaddition < 0 or outerturns < 0:
@@ -371,12 +362,10 @@ def change_turns(innerturnsaddition, outerturns):
     femm.mi_setblockprop("24 AWG", 1, 0, "Outer Coil", 0, 2, outerturns)
     femm.mi_clearselected()
 
-
 ########################################ITERATIVE PART########################################
 middlerp = (26.5, -4)
 leftrp = (31, -4)   # outer wall
 rightrp = (22, -4)  # inner wall
-
 
 class lowfluxdensity(Exception):
     pass
@@ -388,8 +377,8 @@ def nd_target(max_value, y, y_peak, constant):
     return max_value * np.exp(-(y - y_peak) ** 2 / constant)
 
 region1 = (25.5, 27.5, ymin, ypeak)
-region2L = (30.95, 30.5, 1, 23.5)
-region2R = (22.05, 22.5, 1, 23.5)
+region2L = (22.05, 22.55, 1, 23.5)
+region2R = (30.95, 39.9, 1, 23.5)
 
 def get_uniformity_score(y1, y2):
     ysegments = np.linspace(y1, y2, 20)
@@ -433,7 +422,6 @@ def check_max_fd():
     if max(values) < 0.02:
         raise lowfluxdensity()
 
-
 def get_penetration_depth_score():
     y_exit = 26
     y_anode = ymin
@@ -450,7 +438,6 @@ def get_penetration_depth_score():
 
 ########################################OPTIMISATION PART########################################
 runcount = 0
-
 
 def get_score(x):
     plate_chamfered = False
@@ -474,7 +461,7 @@ def get_score(x):
         region1_score = get_region1_score(*region1)
         region2_score = (get_region2_score(*region2L) + get_region2_score(*region2R)) / 2
         depth = get_penetration_depth_score()
-        uniformity = get_uniformity_score(23.5, 15)
+        uniformity = get_uniformity_score(23.5, 10)
 
         #score
         score = region1_score + region2_score
@@ -506,7 +493,6 @@ def get_score(x):
             undo_plate_chamfers()
         if screen_chamfered:
             undo_screen_chamfers()
-
 
 #order: shield thickness, shield height, shield gap, inner turns addition, outer turns, current, screen chamfer width/length, plate chamfer width/length.
 bounds = [(0.5, 2.99), (30, 44.95), (0.1, 1), (1, 500), (1, 500), (1, 10), (0.1, abs(sp3.x - sp2.x) - 0.01), (0.1, abs(sp1.swh - 21)), (0.1, abs(tpp3.y - tpp4.y) - 0.01), (0.1, abs(tpp4.x - tpp5.x) - 0.01)]
