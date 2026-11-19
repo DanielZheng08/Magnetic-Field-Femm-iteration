@@ -4,7 +4,7 @@ Daniel Zheng, 17/10/26
 ################[SET THESE BEFORE STARTING]##################
 filepath = r"C:\Uni work\Electric Propulsions\IterativeBase - Copy.fem"
 isolatorratio = 1.5
-c = 150
+c = 200
 targetflux = 0.025
 ypeak = 30.5
 ymin = -4
@@ -414,7 +414,7 @@ def get_region2_score(x1, x2, y1, y2):
     return scoreR / 150
 
 def check_max_fd():
-    ycoords = np.linspace(22, 30, 5)
+    ycoords = np.linspace(22, ypeak, 10)
     values = []
     for i in ycoords:
         Br, Bz = femm.mo_getb(26.5, i)
@@ -459,7 +459,9 @@ def get_score(x):
         check_max_fd()
 
         region1_score = get_region1_score(*region1)
-        region2_score = (get_region2_score(*region2L) + get_region2_score(*region2R)) / 2
+        inner_wall_score = get_region2_score(*region2L)
+        outer_wall_score = get_region2_score(*region2R)
+        region2_score = max(inner_wall_score, outer_wall_score)
         depth = get_penetration_depth_score()
         uniformity = get_uniformity_score(23.5, 10)
 
@@ -477,6 +479,8 @@ def get_score(x):
         print("Current:", x[5])
         print("########################################")
         print("Region 1 score:", region1_score)
+        print("Inner wall score:", inner_wall_score)
+        print("Outer wall score:", outer_wall_score)
         print("Region 2 score:", region2_score)
         print("Depth score:", depth)
         print("Uniformity score:", uniformity)
@@ -514,3 +518,10 @@ def optimise():
     print("Plate Chamfer    =", results.x[8], " x ", results.x[9])
     print("#############################################################################################")
     print("Best score: ", results.fun)
+    redraw_screen(results.x[0], results.x[1], results.x[2])
+
+    chamfer_screening(results.x[6], results.x[7])
+    chamfer_top_plate(results.x[8], results.x[9])
+
+    change_turns(results.x[3], results.x[4])
+    change_current(results.x[5])
