@@ -2,7 +2,8 @@
 Daniel Zheng, 17/10/26
 '''
 ################[SET THESE BEFORE STARTING]##################
-filepath = r"C:\Uni work\Electric Propulsions\IterativeBase - Copy.fem"
+filepath = "C:\\Uni work\\Electric Propulsions\\IterativeBase1.fem"
+portval=48016
 isolatorratio = 1.5
 c = 200
 targetflux = 0.025
@@ -11,11 +12,12 @@ ymin = -4
 #############################################################
 
 import femm
+import femm as femm_module
+femm = femm_module.FemmSession(port=portval)
 import numpy as np
 from scipy.optimize import differential_evolution
 
 def open_femm():
-    femm.openfemm()
     femm.opendocument(filepath)
 
 def run_femm():
@@ -466,8 +468,8 @@ def get_score(x):
         uniformity = get_uniformity_score(23.5, 10)
 
         #score
-        score = region1_score + region2_score
-
+        score = region1_score + 10*region2_score  
+        
         print("########################################")
         print("Run:", runcount)
         print("########################################")
@@ -477,6 +479,8 @@ def get_score(x):
         print("Inner coil turns:", x[3] + x[4])
         print("Outer coil turns:", x[4])
         print("Current:", x[5])
+        print("Screen Chamfer   =", x[6], " x ", x[7])
+        print("Plate Chamfer    =", x[8], " x ", x[9])
         print("########################################")
         print("Region 1 score:", region1_score)
         print("Inner wall score:", inner_wall_score)
@@ -499,10 +503,10 @@ def get_score(x):
             undo_screen_chamfers()
 
 #order: shield thickness, shield height, shield gap, inner turns addition, outer turns, current, screen chamfer width/length, plate chamfer width/length.
-bounds = [(0.5, 2.99), (30, 44.95), (0.1, 1), (1, 500), (1, 500), (1, 10), (0.1, abs(sp3.x - sp2.x) - 0.01), (0.1, abs(sp1.swh - 21)), (0.1, abs(tpp3.y - tpp4.y) - 0.01), (0.1, abs(tpp4.x - tpp5.x) - 0.01)]
+bounds = [(0.5, 2.99), (30, 44.95), (0.1, 1), (1, 500), (100, 500), (1, 10), (0.1, abs(sp3.x - sp2.x) - 0.01), (0.1, abs(sp1.swh - 21)), (0.1, abs(tpp3.y - tpp4.y) - 0.01), (0.1, abs(tpp4.x - tpp5.x) - 0.01)]
 
 def optimise():
-    results = differential_evolution( get_score, bounds, integrality=(False, False, False, True, True, False, False, False, False, False), popsize=15, maxiter=150, polish=True, disp=True)
+    results = differential_evolution( get_score, bounds, strategy='rand1bin', integrality=(False, False, False, True, True, False, False, False, False, False), popsize=15, maxiter=150, polish=True, disp=True)
 
     print("################################### Optimisation Finished ###################################")
     print("Nodes:")
