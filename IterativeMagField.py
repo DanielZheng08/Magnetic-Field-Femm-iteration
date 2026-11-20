@@ -2,8 +2,8 @@
 Daniel Zheng, 17/10/26
 '''
 ################[SET THESE BEFORE STARTING]##################
-filepath = "C:\\Uni work\\Electric Propulsions\\Multiple Sims\\IterativeBase1.fem"
-portval=48016
+filepath = "C:\\Uni work\\Electric Propulsions\\Multiple Sims\\IterativeBase2.fem"
+portval=48017
 isolatorratio = 1.5
 c = 200
 targetflux = 0.025
@@ -380,7 +380,7 @@ def nd_target(max_value, y, y_peak, constant):
 
 region1 = (25.5, 27.5, ymin, ypeak)
 region2L = (22.05, 22.55, 1, 23.5)
-region2R = (30.5, 30.95, 1, 23.5)
+region2R = (30.95, 39.9, 1, 23.5)
 
 def get_uniformity_score(y1, y2):
     ysegments = np.linspace(y1, y2, 20)
@@ -415,6 +415,17 @@ def get_region2_score(x1, x2, y1, y2):
             scoreR += (Br / targetflux) ** 2
     return scoreR / 150
 
+def get_region3_score(x1, x2, y1, y2):
+    xsegments = np.linspace(x1, x2, 3)
+    ysegments = np.linspace(y1, y2, 50)
+    scoreR = 0
+    for i in xsegments:
+        for j in ysegments:
+            Br, Bz = femm.mo_getb(i, j)
+            scoreR += (Br / targetflux) ** 2
+    return scoreR / 150
+    
+
 def check_max_fd():
     ycoords = np.linspace(22, ypeak, 10)
     values = []
@@ -440,6 +451,11 @@ def get_penetration_depth_score():
 
 ########################################OPTIMISATION PART########################################
 runcount = 0
+region1 = (25.5, 27.5, ymin, ypeak)
+region2L = (22.05, 22.55, 1, 23.5)
+region2R = (30.95, 39.9, 1, 23.5)
+region3L = (tpp8.x, 19, tpp8.y, Prightwidth.y) #LEFT SIDE
+region3R = (34, tpp3.x, tpp3.y, Pleftwidth.y) #RIGHT SIDE
 
 def get_score(x):
     plate_chamfered = False
@@ -464,11 +480,15 @@ def get_score(x):
         inner_wall_score = abs(get_region2_score(*region2L))
         outer_wall_score = abs(get_region2_score(*region2R))
         region2_score = max(inner_wall_score, outer_wall_score)
+        inner_grazing_score = abs(get_region3_score(*region3L))
+        outer_grazing_score = abs(get_region3_score(*region3R))
+        region3_score = max(inner_grazing_score, outer_grazing_score)
+        #bonus+penaltys
         depth = get_penetration_depth_score()
         uniformity = get_uniformity_score(23.5, 10)
 
         #score
-        score = region1_score + region2_score  
+        score = region1_score + region2_score + region3_score + depth
         
         print("########################################")
         print("Run:", runcount)
