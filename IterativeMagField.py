@@ -380,7 +380,7 @@ def nd_target(max_value, y, y_peak, constant):
 
 region1 = (25.5, 27.5, ymin, ypeak)
 region2L = (22.05, 22.55, 1, 23.5)
-region2R = (30.95, 39.9, 1, 23.5)
+region2R = (30.5, 30.95, 1, 23.5)
 
 def get_uniformity_score(y1, y2):
     ysegments = np.linspace(y1, y2, 20)
