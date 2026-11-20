@@ -2,7 +2,7 @@
 Daniel Zheng, 17/10/26
 '''
 ################[SET THESE BEFORE STARTING]##################
-filepath = "C:\\Uni work\\Electric Propulsions\\IterativeBase1.fem"
+filepath = "C:\\Uni work\\Electric Propulsions\\Multiple Sims\\IterativeBase1.fem"
 portval=48016
 isolatorratio = 1.5
 c = 200
@@ -461,14 +461,14 @@ def get_score(x):
         check_max_fd()
 
         region1_score = get_region1_score(*region1)
-        inner_wall_score = get_region2_score(*region2L)
-        outer_wall_score = get_region2_score(*region2R)
+        inner_wall_score = abs(get_region2_score(*region2L))
+        outer_wall_score = abs(get_region2_score(*region2R))
         region2_score = max(inner_wall_score, outer_wall_score)
         depth = get_penetration_depth_score()
         uniformity = get_uniformity_score(23.5, 10)
 
         #score
-        score = region1_score + 10*region2_score  
+        score = region1_score + region2_score  
         
         print("########################################")
         print("Run:", runcount)
